@@ -3,14 +3,17 @@ services:
     name: EventMaster1
     runtime: python
     python:
-      version: "3.11.7"  # Явное указание версии
+      version: "3.11.7"
     buildCommand: |
-      pyenv install 3.11.7 --skip-existing
-      pyenv global 3.11.7
       python -m pip install --upgrade pip
+      pip install setuptools==65.5.1 wheel
       pip install -r requirements.txt
-    startCommand: gunicorn main:app --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT --workers 4
+    startCommand: |
+      PORT=${PORT:-8000}
+      uvicorn main:app --host 0.0.0.0 --port $PORT --workers 4
     envVars:
+      - key: APP_ENV
+        value: production
       - key: DATABASE_URL
         fromDatabase:
           name: urfutable
