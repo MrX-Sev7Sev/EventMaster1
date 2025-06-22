@@ -1,0 +1,13 @@
+# render.yaml
+services:
+  - type: web
+    name: EventMaster1
+    runtime: python
+    buildCommand: |
+      pip install -r requirements.txt
+    startCommand: gunicorn -w 4 -k uvicorn.workers.UvicornWorker main:app
+    envVars:
+      - key: MAILRU_CLIENT_ID
+        value: 890ea7b9c21d4fe98aeccd1a457dc9fc
+      - key: MAILRU_CLIENT_SECRET
+        value: 19ef2f3739f1461d9adc5894ecfc0f13
