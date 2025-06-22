@@ -35,12 +35,12 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 # Настройки JWT
-SECRET_KEY = os.getenv("SECRET_KEY", "dabcd52")
+SECRET_KEY = os.getenv("SECRET_KEY", "d2еlf43!kL_42$%k42Qwgaa1@fkEjd*daP2")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login")
 
 # Настройки Mail.ru OAuth
 MAILRU_CLIENT_ID = os.getenv("MAILRU_CLIENT_ID")
@@ -150,8 +150,8 @@ def create_access_token(data: dict, expires_delta: timedelta = None):
 
 async def get_current_user(token: str = Depends(oauth2_scheme), db = Depends(get_db)):
     credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
+        status_code=401,
+        detail="Invalid token",
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
@@ -177,6 +177,7 @@ async def signup(user: UserCreate, db = Depends(get_db)):
         db.add(db_user)
         db.commit()
     except Exception as e:
+        print(f"Ошибка регистрации: {str(e)}")  # Логируем ошибку
         db.rollback()
         raise HTTPException(
             status_code=400,
