@@ -1,10 +1,9 @@
-# backend/requirements.txt
-fastapi==0.99.1
-uvicorn==0.23.2
+fastapi==0.100.1  # Последняя версия, совместимая с Pydantic 1.x
+uvicorn==0.25.0
 python-dotenv==1.0.0
 sqlalchemy==2.0.21
 psycopg2-binary==2.9.7
 python-jose==3.3.0
 passlib==1.7.4
 requests==2.31.0
-pydantic==2.4.2
+pydantic==1.10.13  # Версия, которая точно работает с FastAPI 0.100.1
