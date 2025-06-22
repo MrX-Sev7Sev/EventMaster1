@@ -1,11 +1,18 @@
 services:
   - type: web
     name: EventMaster1
-    runtime: python:
-               version: 3.11.6
+    runtime: python
+    python:
+      version: 3.11.7
     buildCommand: |
+      pip install --upgrade pip
       pip install -r requirements.txt
-    startCommand: gunicorn main:app --worker-class uvicorn.workers.UvicornWorker --workers 4 --bind 0.0.0.0:$PORT
+    startCommand: |
+      gunicorn main:app \
+        --worker-class uvicorn.workers.UvicornWorker \
+        --workers 4 \
+        --bind 0.0.0.0:$PORT \
+        --timeout 120
     envVars:
       - key: DATABASE_URL
         fromDatabase:
