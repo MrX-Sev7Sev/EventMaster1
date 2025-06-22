@@ -1,9 +1,10 @@
-fastapi==0.100.1  # Последняя версия, совместимая с Pydantic 1.x
-uvicorn==0.25.0
+fastapi==0.109.1
+uvicorn==0.27.0
 python-dotenv==1.0.0
-sqlalchemy==2.0.21
-psycopg2-binary==2.9.7
+sqlalchemy==2.0.25
+psycopg2-binary==2.9.9
 python-jose==3.3.0
 passlib==1.7.4
 requests==2.31.0
-pydantic==1.10.13  # Версия, которая точно работает с FastAPI 0.100.1
+pydantic==1.10.15
+gunicorn==21.2.0
