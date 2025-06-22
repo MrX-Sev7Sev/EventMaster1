@@ -3,12 +3,12 @@ services:
     name: EventMaster1
     runtime: python
     python:
-      version: "3.13.4"
+      version: "3.11.7"
     buildCommand: |
       python -V
       pip install --upgrade pip
       pip install -r requirements.txt
-    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT --workers 4
+    startCommand: gunicorn main:app --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT
     envVars:
       - key: DATABASE_URL
         fromDatabase:
