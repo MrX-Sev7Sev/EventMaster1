@@ -5,7 +5,9 @@ services:
     python:
       version: "3.11.7"
     buildCommand: |
-      python -V  # Проверка версии Python (должно быть 3.11.7)
+      pyenv install 3.11.7 --skip-existing
+      pyenv global 3.11.7
+      python -V
       pip install --upgrade pip
       pip install -r requirements.txt
     startCommand: gunicorn main:app --worker-class uvicorn.workers.UvicornWorker --workers 1 --bind 0.0.0.0:$PORT --timeout 120
