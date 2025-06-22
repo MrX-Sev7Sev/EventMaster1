@@ -46,7 +46,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 # Настройки VK OAuth
 VK_CLIENT_ID = os.getenv("890ea7b9c21d4fe98aeccd1a457dc9fc")
 VK_CLIENT_SECRET = os.getenv("19ef2f3739f1461d9adc5894ecfc0f13")
-VK_REDIRECT_URI = os.getenv("https://eventmaster-0w4v.onrender.com")
+VK_REDIRECT_URI = os.getenv("https://eventmaster-0w4v.onrender.com/auth/vk/callback")
 
 # Модели SQLAlchemy
 class User(Base):
