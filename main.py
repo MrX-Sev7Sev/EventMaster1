@@ -178,6 +178,7 @@ async def signup(user: UserCreate, db = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Username already exists")
 
     try:
+        print("Регистрация:", user.dict()) 
         db_user = User(
             username=user.username,
             email=user.email,
