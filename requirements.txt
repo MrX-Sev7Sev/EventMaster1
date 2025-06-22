@@ -5,3 +5,4 @@ sqlalchemy==1.4.46
 psycopg2-binary==2.9.6
 pydantic==1.10.7
 python-dotenv==1.0.0
+PyJWT==2.8.0
