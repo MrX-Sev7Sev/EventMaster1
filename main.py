@@ -77,7 +77,9 @@ class PlayerGameAssociation(Base):
     joined_at = Column(DateTime, default=datetime.utcnow)
 
 # Создание таблиц
-Base.metadata.create_all(bind=engine)
+def reset_database():
+    Base.metadata.drop_all(bind=engine)  # Удалить все таблицы
+    Base.metadata.create_all(bind=engine)  # Создать заново
 
 # Модели Pydantic
 class UserBase(BaseModel):
@@ -337,5 +339,6 @@ async def delete_game(game_id: str, current_user: User = Depends(get_current_use
         raise HTTPException(status_code=400, detail=str(e))
 
 if __name__ == "__main__":
+    reset_database() #вывод при запуске
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
