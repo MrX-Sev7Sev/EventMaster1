@@ -1,2 +1,2 @@
 # backend/runtime.txt
-python-3.11.4  
+python-3.11.7
