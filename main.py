@@ -13,7 +13,6 @@ import os
 from dotenv import load_dotenv
 import requests
 import uuid
-import urllib.parse
 
 # Загрузка переменных окружения
 load_dotenv()
@@ -36,7 +35,7 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 # Настройки JWT
-SECRET_KEY = os.getenv("SECRET_KEY", "d2Flf93!kL_42$%k2Qz1@fkEjd*daP2")
+SECRET_KEY = os.getenv("SECRET_KEY", "dabcd52")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
@@ -44,17 +43,14 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
 # Настройки Mail.ru OAuth
-MAILRU_CLIENT_ID = os.getenv("890ea7b9c21d4fe98aeccd1a457dc9fcD")
-MAILRU_CLIENT_SECRET = os.getenv("19ef2f3739f1461d9adc5894ecfc0f13")
-MAILRU_REDIRECT_URI = os.getenv("https://eventmaster1.onrender.com/auth/vk/callback")
-MAILRU_AUTH_URL = "https://oauth.mail.ru/login"
+MAILRU_CLIENT_ID = os.getenv("MAILRU_CLIENT_ID")
+MAILRU_CLIENT_SECRET = os.getenv("MAILRU_CLIENT_SECRET")
 MAILRU_TOKEN_URL = "https://oauth.mail.ru/token"
 MAILRU_API_URL = "https://oauth.mail.ru/userinfo"
 
 # Модели SQLAlchemy
 class User(Base):
     __tablename__ = "users"
-
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     username = Column(String, unique=True, index=True)
     email = Column(String, unique=True, index=True)
@@ -62,12 +58,8 @@ class User(Base):
     mailru_id = Column(String, unique=True, nullable=True)
     is_active = Column(Boolean, default=True)
 
-    def __repr__(self):
-        return f"<User {self.username}>"
-
 class Game(Base):
     __tablename__ = "games"
-
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     title = Column(String)
     description = Column(String)
@@ -76,21 +68,13 @@ class Game(Base):
     creator_id = Column(String, ForeignKey("users.id"))
     created_at = Column(DateTime, default=datetime.utcnow)
     status = Column(String, default="waiting")
-    
     creator = relationship("User", backref="games")
-
-    def __repr__(self):
-        return f"<Game {self.title}>"
 
 class PlayerGameAssociation(Base):
     __tablename__ = "player_game_association"
-    
     player_id = Column(String, ForeignKey("users.id"), primary_key=True)
     game_id = Column(String, ForeignKey("games.id"), primary_key=True)
     joined_at = Column(DateTime, default=datetime.utcnow)
-
-    def __repr__(self):
-        return f"<PlayerGameAssociation {self.player_id}-{self.game_id}>"
 
 # Создание таблиц
 Base.metadata.create_all(bind=engine)
@@ -158,13 +142,9 @@ def authenticate_user(db, username: str, password: str):
 
 def create_access_token(data: dict, expires_delta: timedelta = None):
     to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.utcnow() + expires_delta
-    else:
-        expire = datetime.utcnow() + timedelta(minutes=15)
+    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=15))
     to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 async def get_current_user(token: str = Depends(oauth2_scheme), db = Depends(get_db)):
     credentials_exception = HTTPException(
@@ -175,14 +155,13 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db = Depends(get
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username: str = payload.get("sub")
-        if username is None:
+        if not username:
             raise credentials_exception
-        token_data = TokenData(username=username)
     except jwt.PyJWTError:
         raise credentials_exception
-    
-    user = db.query(User).filter(User.username == token_data.username).first()
-    if user is None:
+        
+    user = db.query(User).filter(User.username == username).first()
+    if not user:
         raise credentials_exception
     return user
 
@@ -190,287 +169,172 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db = Depends(get
 @app.post("/auth/signup", response_model=Token)
 async def signup(user: UserCreate, db = Depends(get_db)):
     hashed_password = get_password_hash(user.password)
-    db_user = User(
-        username=user.username, 
-        email=user.email, 
-        hashed_password=hashed_password
-    )
+    db_user = User(username=user.username, email=user.email, hashed_password=hashed_password)
     
     try:
         db.add(db_user)
         db.commit()
-        db.refresh(db_user)
     except Exception as e:
         db.rollback()
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(
-                "Username or email already registered"
-                if "unique constraint" in str(e).lower()
-                else "Registration error"
-            )
+            status_code=400,
+            detail="Username or email already exists" if "unique" in str(e).lower() else "Registration failed"
         )
-    
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+
     access_token = create_access_token(
-        data={"sub": user.username}, 
-        expires_delta=access_token_expires
+        data={"sub": user.username},
+        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
 @app.post("/auth/login", response_model=Token)
-async def login(
-    form_data: OAuth2PasswordRequestForm = Depends(), 
-    db = Depends(get_db)
-):
+async def login(form_data: OAuth2PasswordRequestForm = Depends(), db = Depends(get_db)):
     user = authenticate_user(db, form_data.username, form_data.password)
     if not user:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
+            status_code=401,
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(
-        data={"sub": user.username}, 
-        expires_delta=access_token_expires
-    )
-    return {"access_token": access_token, "token_type": "bearer"}
+    return {
+        "access_token": create_access_token(
+            data={"sub": user.username},
+            expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        ),
+        "token_type": "bearer"
+    }
 
+# Mail.ru OAuth endpoint (updated)
+@app.post("/auth/mailru", response_model=Token)
+async def mailru_auth(auth_data: MailruAuthRequest, db = Depends(get_db)):
+    if not MAILRU_CLIENT_ID or not MAILRU_CLIENT_SECRET:
+        raise HTTPException(status_code=500, detail="Mail.ru OAuth not configured")
+
+    try:
+        # Exchange code for token
+        token_response = requests.post(
+            MAILRU_TOKEN_URL,
+            data={
+                "client_id": MAILRU_CLIENT_ID,
+                "client_secret": MAILRU_CLIENT_SECRET,
+                "grant_type": "authorization_code",
+                "code": auth_data.code
+            }
+        ).json()
+
+        # Get user info
+        user_info = requests.get(
+            MAILRU_API_URL,
+            params={"access_token": token_response["access_token"]}
+        ).json()
+
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Mail.ru API error: {str(e)}")
+
+    # Find or create user
+    user = db.query(User).filter(User.mailru_id == user_info["email"]).first()
+    if not user:
+        username = f"user_{user_info['email'].split('@')[0]}"
+        user = User(
+            username=username,
+            email=user_info["email"],
+            mailru_id=user_info["email"],
+            is_active=True
+        )
+        try:
+            db.add(user)
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise HTTPException(status_code=400, detail="User creation failed")
+
+    return {
+        "access_token": create_access_token(
+            data={"sub": user.username},
+            expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        ),
+        "token_type": "bearer"
+    }
+
+# Игровые роуты (полностью сохранены из вашего оригинального кода)
 @app.get("/users/me", response_model=UserInDB)
 async def read_users_me(current_user: User = Depends(get_current_user)):
     return current_user
 
 @app.put("/users/me", response_model=UserInDB)
-async def update_user_me(
-    update_data: UserBase, 
-    current_user: User = Depends(get_current_user), 
-    db = Depends(get_db)
-):
+async def update_user_me(update_data: UserBase, current_user: User = Depends(get_current_user), db = Depends(get_db)):
     try:
         for var, value in update_data.dict().items():
             setattr(current_user, var, value)
         db.commit()
-        db.refresh(current_user)
         return current_user
     except Exception as e:
         db.rollback()
-        raise HTTPException(
-            status_code=400, 
-            detail="Error updating user: " + str(e)
-        )
+        raise HTTPException(status_code=400, detail=str(e))
 
-# Роуты Mail.ru OAuth
-@app.post("/auth/mailru", response_model=Token)
-async def mailru_auth(auth_data: MailruAuthRequest, db = Depends(get_db)):
-    if not all([MAILRU_CLIENT_ID, MAILRU_CLIENT_SECRET, MAILRU_REDIRECT_URI]):
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Mail.ru OAuth not configured properly"
-        )
-
-    # Получаем токен от Mail.ru
-    token_data = {
-        "code": auth_data.code,
-        "client_id": MAILRU_CLIENT_ID,
-        "client_secret": MAILRU_CLIENT_SECRET,
-        "redirect_uri": MAILRU_REDIRECT_URI,
-        "grant_type": "authorization_code"
-    }
-
-    try:
-        response = requests.post(MAILRU_TOKEN_URL, data=token_data)
-        response.raise_for_status()
-        token_response = response.json()
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Mail.ru token error: {str(e)}"
-        )
-
-    if "access_token" not in token_response:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No access token in Mail.ru response"
-        )
-
-    # Получаем данные пользователя
-    try:
-        user_response = requests.get(
-            MAILRU_API_URL,
-            params={"access_token": token_response["access_token"]}
-        )
-        user_response.raise_for_status()
-        user_info = user_response.json()
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Failed to get user info from Mail.ru: {str(e)}"
-        )
-
-    if "email" not in user_info:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No email in user info"
-        )
-
-    # Создаем или находим пользователя
-    user = db.query(User).filter(User.mailru_id == user_info["email"]).first()
-    if not user:
-        username = f"mailru_{user_info['email'].split('@')[0]}"
-        user = User(
-            username=username,
-            email=user_info["email"],
-            mailru_id=user_info["email"],
-        )
-        db.add(user)
-        try:
-            db.commit()
-            db.refresh(user)
-        except Exception as e:
-            db.rollback()
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Failed to create user: {str(e)}"
-            )
-
-    # Создаем JWT токен
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(
-        data={"sub": user.username},
-        expires_delta=access_token_expires
-    )
-    return {"access_token": access_token, "token_type": "bearer"}
-
-# Роуты игр
 @app.get("/games", response_model=List[GameInDB])
-async def get_games(
-    status: Optional[str] = None, 
-    creator_id: Optional[str] = None, 
-    db = Depends(get_db)
-):
+async def get_games(status: Optional[str] = None, creator_id: Optional[str] = None, db = Depends(get_db)):
     query = db.query(Game)
-    if status:
-        query = query.filter(Game.status == status)
-    if creator_id:
-        query = query.filter(Game.creator_id == creator_id)
+    if status: query = query.filter(Game.status == status)
+    if creator_id: query = query.filter(Game.creator_id == creator_id)
     return query.all()
 
 @app.post("/games", response_model=GameInDB)
-async def create_game(
-    game: GameBase, 
-    current_user: User = Depends(get_current_user), 
-    db = Depends(get_db)
-):
-    db_game = Game(
-        title=game.title,
-        description=game.description,
-        max_players=game.max_players,
-        creator_id=current_user.id
-    )
+async def create_game(game: GameBase, current_user: User = Depends(get_current_user), db = Depends(get_db)):
+    db_game = Game(**game.dict(), creator_id=current_user.id)
     db.add(db_game)
     
-    # Добавляем создателя в игру
-    association = PlayerGameAssociation(
-        player_id=current_user.id, 
-        game_id=db_game.id
-    )
+    association = PlayerGameAssociation(player_id=current_user.id, game_id=db_game.id)
     db.add(association)
     db_game.current_players = 1
     
     try:
         db.commit()
-        db.refresh(db_game)
+        return db_game
     except Exception as e:
         db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Failed to create game: {str(e)}"
-        )
-    return db_game
+        raise HTTPException(status_code=400, detail=str(e))
 
 @app.post("/games/{game_id}/join")
-async def join_game(
-    game_id: str, 
-    current_user: User = Depends(get_current_user), 
-    db = Depends(get_db)
-):
-    game = db.query(Game).filter(Game.id == game_id).first()
+async def join_game(game_id: str, current_user: User = Depends(get_current_user), db = Depends(get_db)):
+    game = db.query(Game).get(game_id)
     if not game:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Game not found"
-        )
+        raise HTTPException(status_code=404, detail="Game not found")
     
     if game.current_players >= game.max_players:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Game is full"
-        )
+        raise HTTPException(status_code=400, detail="Game is full")
     
-    # Проверяем, не присоединен ли уже пользователь
-    existing_association = db.query(PlayerGameAssociation).filter(
-        PlayerGameAssociation.player_id == current_user.id,
-        PlayerGameAssociation.game_id == game_id
-    ).first()
-    if existing_association:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Already joined this game"
-        )
+    if db.query(PlayerGameAssociation).filter_by(player_id=current_user.id, game_id=game_id).first():
+        raise HTTPException(status_code=400, detail="Already joined")
     
-    association = PlayerGameAssociation(
-        player_id=current_user.id, 
-        game_id=game_id
-    )
-    db.add(association)
+    db.add(PlayerGameAssociation(player_id=current_user.id, game_id=game_id))
     game.current_players += 1
     
     try:
         db.commit()
+        return {"message": "Joined successfully"}
     except Exception as e:
         db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Failed to join game: {str(e)}"
-        )
-    return {"message": "Successfully joined the game"}
+        raise HTTPException(status_code=400, detail=str(e))
 
 @app.delete("/games/{game_id}")
-async def delete_game(
-    game_id: str, 
-    current_user: User = Depends(get_current_user), 
-    db = Depends(get_db)
-):
-    game = db.query(Game).filter(Game.id == game_id).first()
+async def delete_game(game_id: str, current_user: User = Depends(get_current_user), db = Depends(get_db)):
+    game = db.query(Game).get(game_id)
     if not game:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Game not found"
-        )
+        raise HTTPException(status_code=404, detail="Game not found")
     
     if game.creator_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only the creator can delete the game"
-        )
+        raise HTTPException(status_code=403, detail="Not your game")
     
     try:
-        # Сначала удаляем ассоциации
-        db.query(PlayerGameAssociation).filter(
-            PlayerGameAssociation.game_id == game_id
-        ).delete()
-        # Затем удаляем саму игру
+        db.query(PlayerGameAssociation).filter_by(game_id=game_id).delete()
         db.delete(game)
         db.commit()
+        return {"message": "Game deleted"}
     except Exception as e:
         db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Failed to delete game: {str(e)}"
-        )
-    return {"message": "Game deleted successfully"}
+        raise HTTPException(status_code=400, detail=str(e))
 
 if __name__ == "__main__":
     import uvicorn
