@@ -158,7 +158,6 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db = Depends(get
         username = payload.get("sub")
         if not username:
             raise HTTPException(status_code=401, detail="Invalid token")
-        return username
         user = db.query(User).filter(User.username == username).first()
         if not user:
             raise HTTPException(status_code=401, detail="User not found")
