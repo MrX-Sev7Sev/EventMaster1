@@ -4,7 +4,7 @@ uvicorn==0.22.0
 gunicorn==20.1.0
 
 # Аутентификация и безопасность
-python-jose==3.3.0  # (включает jwt)
+PyJWT==2.8.0  # (включает jwt)
 passlib==1.7.4
 bcrypt==4.0.1
 python-multipart==0.0.6
