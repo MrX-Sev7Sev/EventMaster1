@@ -22,7 +22,11 @@ app = FastAPI()
 # Настройки CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "https://table-games.netlify.app",
+        "http://localhost:3000",
+        "http://localhost:5173" # Для разработки
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -154,6 +158,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db = Depends(get
         username = payload.get("sub")
         if not username:
             raise HTTPException(status_code=401, detail="Invalid token")
+        return username
         user = db.query(User).filter(User.username == username).first()
         if not user:
             raise HTTPException(status_code=401, detail="User not found")
@@ -161,7 +166,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db = Depends(get
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token expired")
     except jwt.PyJWTError:
-        raise HTTPException(status_code=401, detail="Invalid token")
+        raise HTTPException(status_code=401, detail="Not authenticated")  # Здесь возникает ошибка
 
 # Роуты аутентификации
 @app.post("/api/auth/signup")
@@ -186,8 +191,8 @@ async def signup(user: UserCreate, db = Depends(get_db)):
             "user": db_user  # Добавляем пользователя в ответ
         }
     except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=400, detail=f"Registration failed: {str(e)}")
+        print(f"Ошибка регистрации: {str(e)}")  # Логи в консоль сервера
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/auth/login", response_model=Token)
 async def login(form_data: OAuth2PasswordRequestForm = Depends(), db = Depends(get_db)):
