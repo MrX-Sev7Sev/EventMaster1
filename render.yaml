@@ -15,9 +15,12 @@ services:
       - key: APP_ENV
         value: production
       - key: DATABASE_URL
+        value: postgresql://mrx:2IAsjs5oOfdEgB2pacpqdPZbhaMOmFN1@dpg-d1aj6jmmcj7s73fjkdu0-a/urfutable
         fromDatabase:
           name: urfutable
           property: connectionString
+      - key: PYTHONUNBUFFERED
+        value: 1
       - key: SECRET_KEY
         value: d2Flf93!kL_42$%k2Qz1@fkEjd*daP2
       - key: MAILRU_CLIENT_ID
