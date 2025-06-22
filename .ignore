@@ -1,0 +1,4 @@
+# backend/.ignore
+__pycache__
+*.pyc
+.env
