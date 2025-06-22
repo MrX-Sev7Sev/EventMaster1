@@ -46,7 +46,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 # Настройки Mail.ru OAuth
 MAILRU_CLIENT_ID = os.getenv("890ea7b9c21d4fe98aeccd1a457dc9fcD")
 MAILRU_CLIENT_SECRET = os.getenv("19ef2f3739f1461d9adc5894ecfc0f13")
-MAILRU_REDIRECT_URI = os.getenv("https://eventmaster-0w4v.onrender.com/auth/vk/callback")
+MAILRU_REDIRECT_URI = os.getenv("https://eventmaster1.onrender.com/auth/vk/callback")
 MAILRU_AUTH_URL = "https://oauth.mail.ru/login"
 MAILRU_TOKEN_URL = "https://oauth.mail.ru/token"
 MAILRU_API_URL = "https://oauth.mail.ru/userinfo"
