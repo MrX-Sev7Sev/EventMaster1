@@ -149,46 +149,45 @@ def create_access_token(data: dict, expires_delta: timedelta = None):
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 async def get_current_user(token: str = Depends(oauth2_scheme), db = Depends(get_db)):
-    credentials_exception = HTTPException(
-        status_code=401,
-        detail="Invalid token",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get("sub")
+        username = payload.get("sub")
         if not username:
-            raise credentials_exception
+            raise HTTPException(status_code=401, detail="Invalid token")
+        user = db.query(User).filter(User.username == username).first()
+        if not user:
+            raise HTTPException(status_code=401, detail="User not found")
+        return user
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired")
     except jwt.PyJWTError:
-        raise credentials_exception
-        
-    user = db.query(User).filter(User.username == username).first()
-    if not user:
-        raise credentials_exception
-    return user
+        raise HTTPException(status_code=401, detail="Invalid token")
 
 # Роуты аутентификации
-@app.post("/api/auth/signup", response_model=Token)
+@app.post("/api/auth/signup")
 async def signup(user: UserCreate, db = Depends(get_db)):
-    hashed_password = get_password_hash(user.password)
-    db_user = User(username=user.username, email=user.email, hashed_password=hashed_password)
-    
+    # Проверяем, существует ли пользователь
+    if db.query(User).filter(User.email == user.email).first():
+        raise HTTPException(status_code=400, detail="Email already exists")
+    if db.query(User).filter(User.username == user.username).first():
+        raise HTTPException(status_code=400, detail="Username already exists")
+
     try:
+        db_user = User(
+            username=user.username,
+            email=user.email,
+            hashed_password=get_password_hash(user.password)
+        )
         db.add(db_user)
         db.commit()
+        return {
+            "access_token": create_access_token({"sub": user.username}),
+            "token_type": "bearer",
+            "user": db_user  # Добавляем пользователя в ответ
+        }
     except Exception as e:
-        print(f"Ошибка регистрации: {str(e)}")  # Логируем ошибку
         db.rollback()
-        raise HTTPException(
-            status_code=400,
-            detail="Username or email already exists" if "unique" in str(e).lower() else "Registration failed"
-        )
-
-    access_token = create_access_token(
-        data={"sub": user.username},
-        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    )
-    return {"access_token": access_token, "token_type": "bearer"}
+        raise HTTPException(status_code=400, detail=f"Registration failed: {str(e)}")
 
 @app.post("/api/auth/login", response_model=Token)
 async def login(form_data: OAuth2PasswordRequestForm = Depends(), db = Depends(get_db)):
