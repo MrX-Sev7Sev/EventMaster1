@@ -168,7 +168,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db = Depends(get
     return user
 
 # Роуты аутентификации
-@app.post("/auth/signup", response_model=Token)
+@app.post("/api/auth/signup", response_model=Token)
 async def signup(user: UserCreate, db = Depends(get_db)):
     hashed_password = get_password_hash(user.password)
     db_user = User(username=user.username, email=user.email, hashed_password=hashed_password)
@@ -189,7 +189,7 @@ async def signup(user: UserCreate, db = Depends(get_db)):
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
-@app.post("/auth/login", response_model=Token)
+@app.post("/api/auth/login", response_model=Token)
 async def login(form_data: OAuth2PasswordRequestForm = Depends(), db = Depends(get_db)):
     user = authenticate_user(db, form_data.username, form_data.password)
     if not user:
@@ -208,7 +208,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db = Depends(g
     }
 
 # Mail.ru OAuth endpoint (updated)
-@app.post("/auth/mailru", response_model=Token)
+@app.post("/api/auth/mailru", response_model=Token)
 async def mailru_auth(auth_data: MailruAuthRequest, db = Depends(get_db)):
     if not MAILRU_CLIENT_ID or not MAILRU_CLIENT_SECRET:
         raise HTTPException(status_code=500, detail="Mail.ru OAuth not configured")
@@ -260,11 +260,11 @@ async def mailru_auth(auth_data: MailruAuthRequest, db = Depends(get_db)):
     }
 
 # Игровые роуты (полностью сохранены из вашего оригинального кода)
-@app.get("/users/me", response_model=UserInDB)
+@app.get("/api/users/me", response_model=UserInDB)
 async def read_users_me(current_user: User = Depends(get_current_user)):
     return current_user
 
-@app.put("/users/me", response_model=UserInDB)
+@app.put("/api/users/me", response_model=UserInDB)
 async def update_user_me(update_data: UserBase, current_user: User = Depends(get_current_user), db = Depends(get_db)):
     try:
         for var, value in update_data.dict().items():
@@ -275,14 +275,14 @@ async def update_user_me(update_data: UserBase, current_user: User = Depends(get
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
 
-@app.get("/games", response_model=List[GameInDB])
+@app.get("/api/games", response_model=List[GameInDB])
 async def get_games(status: Optional[str] = None, creator_id: Optional[str] = None, db = Depends(get_db)):
     query = db.query(Game)
     if status: query = query.filter(Game.status == status)
     if creator_id: query = query.filter(Game.creator_id == creator_id)
     return query.all()
 
-@app.post("/games", response_model=GameInDB)
+@app.post("/api/games", response_model=GameInDB)
 async def create_game(game: GameBase, current_user: User = Depends(get_current_user), db = Depends(get_db)):
     db_game = Game(**game.dict(), creator_id=current_user.id)
     db.add(db_game)
@@ -298,7 +298,7 @@ async def create_game(game: GameBase, current_user: User = Depends(get_current_u
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
 
-@app.post("/games/{game_id}/join")
+@app.post("/api/games/{game_id}/join")
 async def join_game(game_id: str, current_user: User = Depends(get_current_user), db = Depends(get_db)):
     game = db.query(Game).get(game_id)
     if not game:
@@ -320,7 +320,7 @@ async def join_game(game_id: str, current_user: User = Depends(get_current_user)
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
 
-@app.delete("/games/{game_id}")
+@app.delete("/api/games/{game_id}")
 async def delete_game(game_id: str, current_user: User = Depends(get_current_user), db = Depends(get_db)):
     game = db.query(Game).get(game_id)
     if not game:
