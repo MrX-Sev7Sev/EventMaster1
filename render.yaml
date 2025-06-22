@@ -5,8 +5,9 @@ services:
     python:
       version: "3.11.7"  # Явное указание версии
     buildCommand: |
+      pyenv install 3.11.7 --skip-existing
+      pyenv global 3.11.7
       python -m pip install --upgrade pip
-      pip install setuptools==65.5.1 wheel
       pip install -r requirements.txt
     startCommand: gunicorn main:app --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT --workers 4
     envVars:
