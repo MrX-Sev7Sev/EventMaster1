@@ -14,6 +14,9 @@ import os
 from dotenv import load_dotenv
 import requests
 import uuid
+import logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Загрузка переменных окружения
 load_dotenv()
@@ -217,19 +220,15 @@ async def signup(user: UserCreate, db = Depends(get_db)):
         print(f"Ошибка регистрации: {str(e)}")  # Логи в консоль сервера
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/auth/login")
+@app.post("/api/auth/login", response_model=Token)
 async def login(
-    email: str = Form(...),  # Меняем username на email
+    username: str = Form(...),
     password: str = Form(...),
     db: Session = Depends(get_db)
 ):
-    user = db.query(User).filter(or_(
-        User.email == email,
-        User.username == email
-    )).first()
-    
-    if not user or not verify_password(password, user.hashed_password):
-        raise HTTPException(status_code=401, detail="Неверные данные")
+    user = authenticate_user(db, username, password)
+    if not user:
+        raise HTTPException(status_code=401, detail="Incorrect username or password")
     
     return {
         "access_token": create_access_token({"sub": user.username}),
@@ -368,6 +367,7 @@ async def delete_game(game_id: str, current_user: User = Depends(get_current_use
         raise HTTPException(status_code=400, detail=str(e))
 
 if __name__ == "__main__":
+    create_tables()  # Сначала создаем таблицы
     reset_database() #вывод при запуске
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
