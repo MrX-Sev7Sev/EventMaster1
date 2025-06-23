@@ -29,8 +29,7 @@ app.add_middleware(
     allow_origins=[
         "https://table-games.netlify.app",
         "http://localhost:3000",
-        "http://localhost:5173",
-        "https://eventmaster2.onrender.com" # Для разработки
+        "http://localhost:5173"
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -53,8 +52,8 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login")
 
 # Настройки Mail.ru OAuth
-MAILRU_CLIENT_ID = os.getenv("MAILRU_CLIENT_ID")
-MAILRU_CLIENT_SECRET = os.getenv("MAILRU_CLIENT_SECRET")
+MAILRU_CLIENT_ID = os.getenv("MAILRU_CLIENT_ID", "890ea7b9c21d4fe98aeccd1a457dc9fc")
+MAILRU_CLIENT_SECRET = os.getenv("MAILRU_CLIENT_SECRET", "19ef2f3739f1461d9adc5894ecfc0f13")
 MAILRU_TOKEN_URL = "https://oauth.mail.ru/token"
 MAILRU_API_URL = "https://oauth.mail.ru/userinfo"
 
@@ -172,6 +171,13 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db = Depends(get
         raise HTTPException(status_code=401, detail="Token expired")
     except jwt.PyJWTError:
         raise HTTPException(status_code=401, detail="Not authenticated")  # Здесь возникает ошибка
+
+@app.middleware("http")
+async def add_cors_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["Access-Control-Allow-Origin"] = "https://table-games.netlify.app"
+    response.headers["Access-Control-Allow-Credentials"] = "true"
+    return response
 
 @app.get("/")
 async def root():
@@ -331,12 +337,13 @@ async def update_user_me(update_data: UserBase, current_user: User = Depends(get
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
 
-@app.get("/api/games", response_model=List[GameInDB])
-async def get_games(status: Optional[str] = None, creator_id: Optional[str] = None, db = Depends(get_db)):
-    query = db.query(Game)
-    if status: query = query.filter(Game.status == status)
-    if creator_id: query = query.filter(Game.creator_id == creator_id)
-    return query.all()
+@app.get("/api/games")
+async def get_games(db: Session = Depends(get_db)):
+    try:
+        return db.query(Game).all()
+    except Exception as e:
+        print(f"Database error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @app.post("/api/games", response_model=GameInDB)
 async def create_game(game: GameBase, current_user: User = Depends(get_current_user), db = Depends(get_db)):
