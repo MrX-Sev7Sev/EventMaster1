@@ -64,7 +64,7 @@ class User(Base):
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     username = Column(String, unique=True, index=True)
     email = Column(String, unique=True, index=True)
-    hashed_password = Column(String)
+    hashed_password = Column(String)  # Этот столбец должен быть!
     mailru_id = Column(String, unique=True, nullable=True)
     is_active = Column(Boolean, default=True)
 
@@ -172,6 +172,20 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db = Depends(get
         raise HTTPException(status_code=401, detail="Token expired")
     except jwt.PyJWTError:
         raise HTTPException(status_code=401, detail="Not authenticated")  # Здесь возникает ошибка
+        
+@app.get("/api/check-db")
+async def check_db(db: Session = Depends(get_db)):
+    try:
+        db.execute("SELECT 1")
+        tables = db.execute("SELECT table_name FROM information_schema.tables WHERE table_schema='public'").fetchall()
+        users_columns = db.execute("SELECT column_name FROM information_schema.columns WHERE table_name='users'").fetchall()
+        return {
+            "status": "OK",
+            "tables": [t[0] for t in tables],
+            "users_columns": [c[0] for c in users_columns]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
         
 @app.post("/api/auth/refresh")
 async def refresh_token(
@@ -366,8 +380,9 @@ async def delete_game(game_id: str, current_user: User = Depends(get_current_use
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
 
-if __name__ == "__main__":
-    create_tables()  # Сначала создаем таблицы
+if __name__ == "__main__": 
     reset_database() #вывод при запуске
+    create_tables()  # Сначала создаем таблицы
+
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
