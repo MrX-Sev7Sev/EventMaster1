@@ -39,7 +39,7 @@ app.add_middleware(
 )
 
 # Подключение к PostgreSQL
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://mrx:2IAsjs5oOfdEgB2pacpqdPZbhaMOmFN1@dpg-d1aj6jmmcj7s73fjkdu0-a/urfutable")
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://mrx:gQ9KMhmhQsklSywRRWpsT2lyETBdjdqi@dpg-d1cg0ibe5dus73fh8io0-a/urfutable_vr3m")
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
