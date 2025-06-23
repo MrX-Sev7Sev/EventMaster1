@@ -167,6 +167,26 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db = Depends(get
         raise HTTPException(status_code=401, detail="Token expired")
     except jwt.PyJWTError:
         raise HTTPException(status_code=401, detail="Not authenticated")  # Здесь возникает ошибка
+        
+@app.post("/api/auth/refresh")
+async def refresh_token(
+    token: str = Depends(oauth2_scheme),
+    db: Session = Depends(get_db)
+):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username = payload.get("sub")
+        user = db.query(User).filter(User.username == username).first()
+        
+        if not user:
+            raise HTTPException(status_code=401, detail="Invalid user")
+            
+        return {
+            "access_token": create_access_token({"sub": username}),
+            "token_type": "bearer"
+        }
+    except jwt.PyJWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
 
 # Роуты аутентификации
 @app.post("/api/auth/signup")
@@ -195,21 +215,22 @@ async def signup(user: UserCreate, db = Depends(get_db)):
         print(f"Ошибка регистрации: {str(e)}")  # Логи в консоль сервера
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/auth/login", response_model=Token)
-async def login(form_data: OAuth2PasswordRequestForm = Depends(), db = Depends(get_db)):
-    user = authenticate_user(db, form_data.username, form_data.password)
-    if not user:
-        raise HTTPException(
-            status_code=401,
-            detail="Incorrect username or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+@app.post("/api/auth/login")
+async def login(
+    email: str = Form(...),  # Меняем username на email
+    password: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    user = db.query(User).filter(or_(
+        User.email == email,
+        User.username == email
+    )).first()
+    
+    if not user or not verify_password(password, user.hashed_password):
+        raise HTTPException(status_code=401, detail="Неверные данные")
     
     return {
-        "access_token": create_access_token(
-            data={"sub": user.username},
-            expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-        ),
+        "access_token": create_access_token({"sub": user.username}),
         "token_type": "bearer"
     }
 
