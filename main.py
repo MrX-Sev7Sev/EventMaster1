@@ -245,7 +245,11 @@ async def signup(user: UserCreate, db = Depends(get_db)):
         return {
             "access_token": create_access_token({"sub": user.username}),
             "token_type": "bearer",
-            "user": db_user  # Добавляем пользователя в ответ
+            "user": {
+                "id": db_user.id,
+                "username": db_user.username,
+                "email": db_user.email
+            }
         }
     except Exception as e:
         print(f"Ошибка регистрации: {str(e)}")  # Логи в консоль сервера
