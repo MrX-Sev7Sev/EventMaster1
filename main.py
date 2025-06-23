@@ -282,7 +282,7 @@ async def mailru_auth(code: str, state: str, auth_data: MailruAuthRequest, db: S
                 "client_secret": MAILRU_CLIENT_SECRET,
                 "grant_type": "authorization_code",
                 "code": auth_data.code,
-                "redirect_uri": "https://eventmaster2.onrender.com/api/auth/mailru/callback"  # Добавьте ваш URL
+                "redirect_uri": "https://table-games.netlify.app/api/auth/mailru/callback"  # Добавьте ваш URL
             }
         )
         token_response.raise_for_status()
