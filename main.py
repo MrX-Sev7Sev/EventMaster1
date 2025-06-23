@@ -173,6 +173,10 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db = Depends(get
     except jwt.PyJWTError:
         raise HTTPException(status_code=401, detail="Not authenticated")  # Здесь возникает ошибка
 
+@app.get("/")
+async def root():
+    return {"message": "EventMaster API is running"}
+
 @app.get("/api/check-mailru-config")
 async def check_mailru_config():
     return {
