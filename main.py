@@ -26,7 +26,8 @@ app.add_middleware(
     allow_origins=[
         "https://table-games.netlify.app",
         "http://localhost:3000",
-        "http://localhost:5173" # Для разработки
+        "http://localhost:5173",
+        "https://eventmaster2.onrender.com" # Для разработки
     ],
     allow_credentials=True,
     allow_methods=["*"],
