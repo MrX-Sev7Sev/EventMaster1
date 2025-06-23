@@ -262,7 +262,10 @@ async def login(
 
 # Mail.ru OAuth endpoint (updated)
 @app.post("/api/auth/mailru", response_model=Token)
-async def mailru_auth(auth_data: MailruAuthRequest, db: Session = Depends(get_db)):
+async def mailru_auth(code: str, state: str, auth_data: MailruAuthRequest, db: Session = Depends(get_db)):
+    if not state:
+        raise HTTPException(status_code=400, detail="State parameter missing")
+
     if not MAILRU_CLIENT_ID or not MAILRU_CLIENT_SECRET:
         logger.error("Mail.ru OAuth не настроен: отсутствуют client_id или client_secret")
         raise HTTPException(
