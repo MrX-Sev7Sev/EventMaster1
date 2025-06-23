@@ -172,6 +172,13 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db = Depends(get
         raise HTTPException(status_code=401, detail="Token expired")
     except jwt.PyJWTError:
         raise HTTPException(status_code=401, detail="Not authenticated")  # Здесь возникает ошибка
+
+@app.get("/api/check-mailru-config")
+async def check_mailru_config():
+    return {
+        "MAILRU_CLIENT_ID": "Установлен" if MAILRU_CLIENT_ID else "Не установлен",
+        "MAILRU_CLIENT_SECRET": "Установлен" if MAILRU_CLIENT_SECRET else "Не установлен"
+    }
         
 @app.get("/api/check-db")
 async def check_db(db: Session = Depends(get_db)):
@@ -251,55 +258,55 @@ async def login(
 
 # Mail.ru OAuth endpoint (updated)
 @app.post("/api/auth/mailru", response_model=Token)
-async def mailru_auth(auth_data: MailruAuthRequest, db = Depends(get_db)):
+async def mailru_auth(auth_data: MailruAuthRequest, db: Session = Depends(get_db)):
     if not MAILRU_CLIENT_ID or not MAILRU_CLIENT_SECRET:
-        raise HTTPException(status_code=500, detail="Mail.ru OAuth not configured")
+        logger.error("Mail.ru OAuth не настроен: отсутствуют client_id или client_secret")
+        raise HTTPException(
+            status_code=500,
+            detail="OAuth authentication not configured"
+        )
 
     try:
-        # Exchange code for token
+        # Получаем токен
         token_response = requests.post(
             MAILRU_TOKEN_URL,
             data={
                 "client_id": MAILRU_CLIENT_ID,
                 "client_secret": MAILRU_CLIENT_SECRET,
                 "grant_type": "authorization_code",
-                "code": auth_data.code
+                "code": auth_data.code,
+                "redirect_uri": "https://eventmaster2.onrender.com/api/auth/mailru/callback"  # Добавьте ваш URL
             }
-        ).json()
+        )
+        token_response.raise_for_status()
+        token_data = token_response.json()
 
-        # Get user info
+        # Получаем информацию о пользователе
         user_info = requests.get(
             MAILRU_API_URL,
-            params={"access_token": token_response["access_token"]}
+            params={"access_token": token_data["access_token"]}
         ).json()
 
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Mail.ru API error: {str(e)}")
-
-    # Find or create user
-    user = db.query(User).filter(User.mailru_id == user_info["email"]).first()
-    if not user:
-        username = f"user_{user_info['email'].split('@')[0]}"
-        user = User(
-            username=username,
-            email=user_info["email"],
-            mailru_id=user_info["email"],
-            is_active=True
-        )
-        try:
+        # Поиск или создание пользователя
+        user = db.query(User).filter(User.mailru_id == user_info["email"]).first()
+        if not user:
+            user = User(
+                username=f"mailru_{user_info['email'].split('@')[0]}",
+                email=user_info["email"],
+                mailru_id=user_info["email"],
+                is_active=True
+            )
             db.add(user)
             db.commit()
-        except Exception:
-            db.rollback()
-            raise HTTPException(status_code=400, detail="User creation failed")
 
-    return {
-        "access_token": create_access_token(
-            data={"sub": user.username},
-            expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-        ),
-        "token_type": "bearer"
-    }
+        return {
+            "access_token": create_access_token({"sub": user.username}),
+            "token_type": "bearer"
+        }
+
+    except Exception as e:
+        logger.error(f"Ошибка OAuth Mail.ru: {str(e)}")
+        raise HTTPException(status_code=400, detail="OAuth authentication failed")
 
 # Игровые роуты (полностью сохранены из вашего оригинального кода)
 @app.get("/api/users/me", response_model=UserInDB)
